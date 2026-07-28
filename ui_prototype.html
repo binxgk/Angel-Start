@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANGEL启动 v1 - UI 原型</title>
+<!-- 防闪烁：解析前先定主题（localStorage 优先，其次系统偏好） -->
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('angel-theme');
+      var sys = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      var theme = saved || sys;
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root {
+    /* 浅色主题（默认） */
+    --primary: #61c0bf;
+    --secondary: #bbded6;
+    --bg-body: #fae3d9;
+    --bg-card: #ffffff;
+    --bg-nav: #ffffff;
+    --accent: #ffb6b9;
+    --text-primary: #4a4a4a;
+    --text-secondary: #7a7a7a;
+    --text-muted: #b0b0b0;
+    --border: rgba(187, 222, 214, 0.4);
+    --shadow: rgba(97, 192, 191, 0.2);
+    --radius: 12px;
+    --transition: 0.25s ease;
+  }
+
+  [data-theme="dark"] {
+    --primary: #00adb5;
+    --secondary: #3a4550;
+    --bg-body: #303841;
+    --bg-card: #3a4550;
+    --bg-nav: #262e36;
+    --accent: #ff5722;
+    --text-primary: #eeeeee;
+    --text-secondary: #b0b0b0;
+    --text-muted: #7a7a7a;
+    --border: rgba(0, 173, 181, 0.3);
+    --shadow: rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: transparent;
+    color: var(--text-primary);
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+      radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--primary) 25%, transparent), transparent 60%),
+      var(--bg-body);
+    transition: background var(--transition);
+  }
+
+  /* ===== 窗口：去默认黑边 + 圆角 + 阴影 ===== */
+  .window {
+    width: 880px;
+    height: 600px;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-body);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 8px 32px var(--shadow);
+    border: 1px solid var(--border);
+    transition: box-shadow var(--transition), background var(--transition), border-color var(--transition);
+  }
+  [data-theme="dark"] .window {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border);
+  }
+
+  /* ===== 顶栏 ===== */
+  .topbar {
+    height: 52px;
+    flex: 0 0 52px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  /* macOS 风格窗口控制点 */
+  .traffic { display: flex; gap: 8px; align-items: center; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; transition: filter var(--transition); }
+  .dot:hover { filter: brightness(1.15); }
+  .dot.red { background: #ff5f57; }
+  .dot.yellow { background: #febc2e; }
+  .dot.green { background: #28c840; }
+
+  .brand { display: flex; align-items: baseline; gap: 6px; font-weight: 700; font-size: 16px; }
+  .brand .ver { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+
+  .top-spacer { flex: 1; }
+
+  /* 搜索框：纯白背景 + 主色绿图标/聚焦边框 */
+  .search {
+    width: 200px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #ffffff;
+    color: #4a4a4a;
+    padding: 0 12px 0 32px;
+    font-size: 13px;
+    transition: width var(--transition), border-color var(--transition), box-shadow var(--transition);
+  }
+  .search::placeholder { color: #b0b0b0; }
+  .search:focus {
+    width: 280px;
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+  }
+  .search-wrap { position: relative; display: inline-flex; align-items: center; }
+  .search-wrap > i {
+    position: absolute;
+    left: 11px;
+    color: var(--primary);
+    font-size: 13px;
+    pointer-events: none;
+    transition: color var(--transition);
+  }
+
+  .tool-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .tool-btn:hover { background: var(--secondary); }
+  [data-theme="dark"] .tool-btn:hover { background: color-mix(in srgb, var(--primary) 15%, transparent); }
+  .tool-btn:active { transform: scale(0.95); }
+  .tool-btn.theme-toggle { font-size: 15px; }
+
+  /* ===== 主体：左导航 + 内容 ===== */
+  .body { flex: 1; display: flex; min-height: 0; }
+
+  .sidebar {
+    width: 180px;
+    flex: 0 0 180px;
+    background: var(--bg-nav);
+    border-right: 1px solid var(--border);
+    padding: 12px 8px;
+    overflow-y: auto;
+    transition: width var(--transition), background var(--transition);
+  }
+  .nav-title { font-size: 12px; color: var(--text-muted); padding: 4px 10px; letter-spacing: 1px; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    margin: 2px 0;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all var(--transition);
+    font-size: 13px;
+  }
+  .nav-item:hover { background: color-mix(in srgb, var(--secondary) 40%, transparent); color: var(--text-primary); }
+  .nav-item.active {
+    background: var(--primary);
+    color: #ffffff;
+  }
+  [data-theme="dark"] .nav-item.active {
+    background: transparent;
+    border-left: 3px solid var(--accent);
+    color: var(--text-primary);
+  }
+  .nav-item .count {
+    margin-left: auto;
+    font-size: 11px;
+    background: color-mix(in srgb, var(--secondary) 40%, transparent);
+    border-radius: 10px;
+    padding: 1px 7px;
+    color: var(--text-secondary);
+  }
+
+  /* 折叠按钮 + 折叠态（仅显示图标） */
+  .nav-collapse {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; height: 30px; margin-bottom: 6px;
+    border: none; border-radius: 8px; cursor: pointer;
+    background: transparent; color: var(--text-secondary);
+    transition: all var(--transition);
+  }
+  .nav-collapse:hover {
+    background: color-mix(in srgb, var(--secondary) 40%, transparent);
+    color: var(--primary);
+  }
+  .sidebar.collapsed { width: 56px; flex: 0 0 56px; }
+  .sidebar.collapsed .nav-item { justify-content: center; padding: 9px 0; }
+  .sidebar.collapsed .nav-item .label,
+  .sidebar.collapsed .nav-title,
+  .sidebar.collapsed .nav-item .count { display: none; }
+  .sidebar.collapsed .nav-collapse { width: 40px; margin: 0 auto 6px; }
+
+  .content {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
+    align-content: start;
+  }
+
+  /* ===== 图标卡片 ===== */
+  .card {
+    background: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  }
+  .card:nth-child(even) { background: var(--bg-card); }
+  .content.stripes .card:nth-child(even) { background: var(--bg-body); }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  [data-theme="dark"] .card:hover { border-color: var(--primary); }
+  .card .icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    color: #ffffff;
+    background: var(--primary);
+  }
+  .card .name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .card .group { font-size: 12px; color: var(--text-secondary); }
+  .card .group::before { content: "● "; color: var(--primary); }
+  [data-theme="dark"] .card .group::before { color: var(--accent); }
+  .tag {
+    align-self: flex-start;
+    font-size: 11px;
+    background: color-mix(in srgb, var(--secondary) 30%, transparent);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    padding: 2px 8px;
+  }
+
+  /* ===== 底状态栏（含居中搜索框） ===== */
+  .statusbar {
+    height: 44px;
+    flex: 0 0 44px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .statusbar .rec { white-space: nowrap; }
+  .statusbar .search-wrap { margin: 0 auto; }
+  .help {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none; cursor: pointer; color: var(--text-muted);
+    transition: all var(--transition);
+  }
+  .help:hover { color: var(--primary); background: color-mix(in srgb, var(--secondary) 40%, transparent); }
+
+  /* ===== 启动日志表格 ===== */
+  .log-table {
+    grid-column: 1 / -1;
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-card);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  .log-table th, .log-table td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .log-table th {
+    background: color-mix(in srgb, var(--secondary) 30%, transparent);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .log-table tbody tr:nth-child(even) { background: var(--bg-body); }
+  .log-table tbody tr:hover { border-left: 3px solid var(--primary); }
+  .log-table .target { color: var(--text-secondary); font-size: 12px; word-break: break-all; }
+  .log-table .grp::before { content: "● "; color: var(--primary); }
+  [data-theme="dark"] .log-table .grp::before { color: var(--accent); }
+
+  /* ===== 滚动条 ===== */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-body); }
+  ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; opacity: 0.6; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  /* ===== 全局主题切换过渡（防突变） ===== */
+  .window, .topbar, .sidebar, .content, .card, .statusbar, .brand, .nav-item, .tool-btn, .search {
+    transition: background var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+  }
+
+  /* ===== 响应式：窗口缩小，左导航折叠为图标 ===== */
+  @media (max-width: 720px) {
+    .window { width: 96vw; height: 90vh; }
+    .sidebar { width: 56px; flex: 0 0 56px; }
+    .nav-item { justify-content: center; padding: 9px 0; }
+    .nav-item .label, .nav-title, .nav-item .count { display: none; }
+    .brand .ver { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="window">
+    <!-- 顶栏 -->
+    <div class="topbar">
+      <div class="traffic">
+        <span class="dot red" title="关闭"></span>
+        <span class="dot yellow" title="最小化"></span>
+        <span class="dot green" title="最大化"></span>
+      </div>
+      <div class="brand">ANGEL启动 <span class="ver">v1</span></div>
+      <div class="top-spacer"></div>
+      <button class="tool-btn" title="打开目录"><i class="fa-solid fa-folder-open"></i><span class="label">目录</span></button>
+      <button class="tool-btn" title="添加分组"><i class="fa-solid fa-folder-plus"></i><span class="label">加组</span></button>
+      <button class="tool-btn" title="编辑分组"><i class="fa-solid fa-pen"></i><span class="label">编辑</span></button>
+      <button class="tool-btn" title="分组排序"><i class="fa-solid fa-arrow-down-wide-short"></i><span class="label">排序</span></button>
+      <button class="tool-btn" title="删除分组"><i class="fa-solid fa-trash"></i><span class="label">删除</span></button>
+      <button class="tool-btn" title="清空URL缓存"><i class="fa-solid fa-rotate"></i><span class="label">缓存</span></button>
+      <button class="tool-btn" title="设置"><i class="fa-solid fa-gear"></i><span class="label">设置</span></button>
+      <button class="tool-btn theme-toggle" id="themeToggle" title="切换主题"><i class="fa-solid fa-moon"></i></button>
+      <button class="tool-btn" title="退出"><i class="fa-solid fa-power-off"></i></button>
+    </div>
+
+    <!-- 主体 -->
+    <div class="body">
+      <div class="sidebar" id="sidebar">
+        <button class="nav-collapse" id="navToggle" title="折叠 / 展开导航"><i class="fa-solid fa-bars-staggered"></i></button>
+        <div id="navList"><!-- 由 JS 渲染 --></div>
+      </div>
+      <div class="content stripes" id="content"><!-- 由 JS 渲染 --></div>
+    </div>
+
+    <!-- 底状态栏：左=记录数，中=搜索框，右=帮助 -->
+    <div class="statusbar">
+      <span class="rec" id="rec">共 0 条记录</span>
+      <div class="search-wrap">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input class="search" id="search" type="text" placeholder="搜索应用、URL 或备注…">
+      </div>
+      <button class="help" id="help" title="帮助"><i class="fa-solid fa-circle-question"></i></button>
+    </div>
+  </div>
+
+<script>
+  // ===== 模拟数据 =====
+  const APPS = [
+    { name: "VS Code",       group: "工作",   icon: "fa-solid fa-code",            trigger: "双击" },
+    { name: "Chrome",        group: "常用",   icon: "fa-solid fa-earth-asia",      trigger: "单击" },
+    { name: "微信",          group: "常用",   icon: "fa-brands fa-weixin",         trigger: "热键" },
+    { name: "QQ",            group: "常用",   icon: "fa-brands fa-qq",             trigger: "双击" },
+    { name: "钉钉",          group: "工作",   icon: "fa-solid fa-comment-dots",    trigger: "搜索回车" },
+    { name: "Photoshop",     group: "设计",   icon: "fa-solid fa-palette",         trigger: "双击" },
+    { name: "网易云音乐",    group: "娱乐",   icon: "fa-brands fa-spotify",        trigger: "热键" },
+    { name: "Steam",         group: "娱乐",   icon: "fa-brands fa-steam",          trigger: "批量" },
+    { name: "计算器",        group: "系统",   icon: "fa-solid fa-calculator",      trigger: "双击" },
+    { name: "终端",          group: "系统",   icon: "fa-solid fa-terminal",        trigger: "热键" },
+    { name: "备忘录",        group: "工作",   icon: "fa-solid fa-note-sticky",     trigger: "单击" },
+    { name: "截图工具",      group: "系统",   icon: "fa-solid fa-camera",          trigger: "搜索回车" },
+  ];
+
+  const sidebarEl = document.getElementById('sidebar');
+  const navListEl = document.getElementById('navList');
+  const contentEl = document.getElementById('content');
+  const recEl = document.getElementById('rec');
+  const searchEl = document.getElementById('search');
+
+  let currentGroup = '常用';
+  let currentView = 'cards'; // 'cards' | 'log'
+  let keyword = '';
+
+  const LOGS = [
+    { time: "2026-07-23 15:01:22", name: "Chrome",     group: "常用", source: "单击",     target: "https://www.google.com" },
+    { time: "2026-07-23 15:02:10", name: "微信",       group: "常用", source: "热键",     target: "C:\\WeChat\\WeChat.exe" },
+    { time: "2026-07-23 14:58:03", name: "VS Code",    group: "工作", source: "双击",     target: "C:\\VSCode\\Code.exe" },
+    { time: "2026-07-23 14:50:41", name: "网易云音乐", group: "娱乐", source: "热键",     target: "spotify://open" },
+    { time: "2026-07-23 14:40:12", name: "终端",       group: "系统", source: "热键",     target: "wt.exe" },
+  ];
+
+  function groups() {
+    const set = ['全部'];
+    APPS.forEach(a => { if (!set.includes(a.group)) set.push(a.group); });
+    return set;
+  }
+
+  function renderNav() {
+    let html = '';
+    // 启动日志：固定在最顶部
+    const logActive = currentView === 'log' ? ' active' : '';
+    html += `<div class="nav-item${logActive}" data-log="true">
+               <i class="fa-solid fa-clock-rotate-left"></i><span class="label">启动日志</span>
+               <span class="count">${LOGS.length}</span>
+             </div>`;
+    html += '<div class="nav-title">分组</div>';
+    groups().forEach(g => {
+      const cnt = g === '全部' ? APPS.length : APPS.filter(a => a.group === g).length;
+      const active = currentView === 'cards' && currentGroup === g ? ' active' : '';
+      html += `<div class="nav-item${active}" data-group="${g}">
+                 <i class="fa-solid fa-folder"></i><span class="label">${g}</span>
+                 <span class="count">${cnt}</span>
+               </div>`;
+    });
+    navListEl.innerHTML = html;
+    navListEl.querySelectorAll('.nav-item').forEach(el => {
+      el.addEventListener('click', () => {
+        if (el.dataset.log === 'true') { currentView = 'log'; }
+        else { currentView = 'cards'; currentGroup = el.dataset.group; }
+        renderNav(); renderContent();
+      });
+    });
+  }
+
+  function renderCards() {
+    let list = APPS;
+    if (currentGroup !== '全部') list = list.filter(a => a.group === currentGroup);
+    if (keyword) {
+      const k = keyword.toLowerCase();
+      list = list.filter(a => a.name.toLowerCase().includes(k) || a.group.toLowerCase().includes(k));
+    }
+    contentEl.innerHTML = list.map(a => `
+      <div class="card">
+        <div class="icon"><i class="${a.icon}"></i></div>
+        <div class="name">${a.name}</div>
+        <div class="group">${a.group}</div>
+        <span class="tag">${a.trigger}</span>
+      </div>`).join('');
+    recEl.textContent = `共 ${list.length} 条记录`;
+  }
+
+  function renderLog() {
+    let list = LOGS;
+    if (keyword) {
+      const k = keyword.toLowerCase();
+      list = list.filter(l => l.name.toLowerCase().includes(k) || l.group.toLowerCase().includes(k) || l.source.toLowerCase().includes(k));
+    }
+    const rows = list.map(l => `<tr>
+        <td>${l.time}</td>
+        <td>${l.name}</td>
+        <td><span class="grp">${l.group}</span></td>
+        <td><span class="tag">${l.source}</span></td>
+        <td class="target">${l.target}</td>
+      </tr>`).join('');
+    contentEl.innerHTML = `<table class="log-table">
+        <thead><tr><th>时间</th><th>名称</th><th>分组</th><th>触发方式</th><th>目标路径</th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+    recEl.textContent = `共 ${list.length} 条记录`;
+  }
+
+  function renderContent() {
+    if (currentView === 'log') renderLog(); else renderCards();
+  }
+
+  searchEl.addEventListener('input', e => { keyword = e.target.value.trim(); renderContent(); });
+
+  // ===== 主题切换 =====
+  function updateIcon(theme) {
+    const btn = document.getElementById('themeToggle');
+    btn.innerHTML = theme === 'dark'
+      ? '<i class="fa-solid fa-sun"></i>'
+      : '<i class="fa-solid fa-moon"></i>';
+  }
+  function toggleTheme() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    try { localStorage.setItem('angel-theme', next); } catch (e) {}
+    updateIcon(next);
+  }
+  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+  updateIcon(document.documentElement.getAttribute('data-theme'));
+
+  // 左导航折叠 / 展开
+  document.getElementById('navToggle').addEventListener('click', () => {
+    sidebarEl.classList.toggle('collapsed');
+  });
+
+  document.getElementById('help').addEventListener('click', () => {
+    alert('ANGEL启动 v1\n\n· 左键单击 / 双击 启动项目\n· 底部搜索框按名称 / 分组 / 触发方式过滤\n· 左上角 ☰ 可折叠导航为仅图标\n· 右上角 ☀️/🌙 切换浅色 / 深色主题（自动记忆）');
+  });
+
+  // 初始化
+  renderNav();
+  renderContent();
+</script>
+</body>
+</html>
