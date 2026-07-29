@@ -1653,15 +1653,25 @@ class AppListWidget(QListWidget):
         elif clicked_item and not multi_select:
             item: AppItem = clicked_item.data(Qt.UserRole)
             index = self.row(clicked_item)
-            
+            # 「全部」视图下 self.group_name 是虚拟聚合组，需按 item.group 解析真实分组与索引
+            real_group = item.group
+            real_items = win.model.groups.get(real_group, [])
+            real_index = real_items.index(item) if item in real_items else -1
+
             if action in single_copy_to_actions:
-                win.copy_item_to_group(self.group_name, index, single_copy_to_actions[action])
+                if real_index >= 0:
+                    win.copy_item_to_group(real_group, real_index, single_copy_to_actions[action])
             elif action in single_move_to_actions:
-                win.move_item_to_group(self.group_name, index, single_move_to_actions[action])
+                if real_index >= 0:
+                    win.move_item_to_group(real_group, real_index, single_move_to_actions[action])
             elif action == del_action:
-                win.delete_item(self.group_name, index)
+                if real_index >= 0:
+                    win.delete_item(real_group, real_index)
+                else:
+                    QMessageBox.warning(self, "删除失败", "未找到该项所属分组，无法删除。")
             elif action == edit_action:
-                win.edit_item(self.group_name, index)
+                if real_index >= 0:
+                    win.edit_item(real_group, real_index)
             elif action == copy_action:
                 QGuiApplication.clipboard().setText(item.target)
             elif action == open_folder_action:
@@ -3219,18 +3229,19 @@ class LauncherWindow(QMainWindow):
         self._load_ui()
 
     def batch_delete(self, group: str, selected_items):
-        """批量删除选中的项目"""
+        """批量删除选中的项目（按 item.group 解析真实分组，支持「全部」视图）"""
         count = len(selected_items)
         reply = QMessageBox.question(self, "批量删除", f"确定要删除选中的 {count} 个项目吗？",
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply != QMessageBox.Yes:
             return
-        indices = sorted([self.current_list_widget().row(item) for item in selected_items], reverse=True)
-        items = self.model.groups.get(group, [])
-        for idx in indices:
-            if 0 <= idx < len(items):
-                items.pop(idx)
-        self.model.groups[group] = items
+        for list_item in selected_items:
+            item = list_item.data(Qt.UserRole)
+            g = item.group
+            items = self.model.groups.get(g, [])
+            if item in items:
+                items.remove(item)
+                self.model.groups[g] = items
         self.model.save()
         self._apply_all_hotkeys()
         QTimer.singleShot(0, self._load_ui)
@@ -3276,20 +3287,24 @@ class LauncherWindow(QMainWindow):
         self._load_ui()
 
     def batch_move(self, source_group: str, selected_items, target_group: str):
-        """批量移动选中的项目到其他分组"""
-        lw = self.current_list_widget()
-        indices = sorted([lw.row(item) for item in selected_items], reverse=True)
-        source_items = self.model.groups.get(source_group, [])
+        """批量移动选中的项目到其他分组（按 item.group 解析真实源分组，支持「全部」视图）"""
         target_items = self.model.groups.get(target_group, [])
-        for idx in indices:
-            if 0 <= idx < len(source_items):
-                moved_item = source_items.pop(idx)
-                moved_item.group = target_group
-                target_items.append(moved_item)
-        self.model.groups[source_group] = source_items
+        affected_sources = set()
+        for list_item in selected_items:
+            item = list_item.data(Qt.UserRole)
+            g = item.group
+            items = self.model.groups.get(g, [])
+            if item in items:
+                items.remove(item)
+                item.group = target_group
+                target_items.append(item)
+                affected_sources.add(g)
+                self.model.groups[g] = items
         self.model.groups[target_group] = target_items
-        if not source_items and source_group != "默认":
-            del self.model.groups[source_group]
+        # 清理已空的源分组（保留默认分组）
+        for g in affected_sources:
+            if not self.model.groups.get(g) and g != "默认":
+                del self.model.groups[g]
         self.model.save()
         self._apply_all_hotkeys()
         self._load_ui()
